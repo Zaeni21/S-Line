@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Tali Merah Sosial</title>
+  <title>Tali Merah Kepala</title>
   <style>
     body {
       margin: 0;
@@ -11,12 +11,13 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      background-color: #f9f9f9;
+      background-color: #000;
       font-family: Arial, sans-serif;
+      color: white;
     }
     #video {
       display: block;
-      border: 2px solid #000;
+      border: 2px solid #fff;
       width: 320px;
       height: 240px;
       margin-bottom: 10px;
@@ -36,12 +37,12 @@
   <script>
     let video;
     let model;
-    let facePoints = [];
+    let head = null;
 
     function setup() {
       createCanvas(320, 240);
-
       video = document.getElementById('video');
+
       navigator.mediaDevices.getUserMedia({ video: true })
         .then(stream => {
           video.srcObject = stream;
@@ -55,64 +56,58 @@
       tf.setBackend('webgl').then(() => {
         faceLandmarksDetection.load(
           faceLandmarksDetection.SupportedPackages.mediapipeFacemesh
-        ).then((loadedModel) => {
-          model = loadedModel;
-          detectFaces();
+        ).then(m => {
+          model = m;
+          detectFace();
         });
       });
     }
 
     function draw() {
-      background(255);
+      background(0);
 
-      // Gambar titik merah (hidung)
-      fill(255, 0, 0);
-      noStroke();
-      for (let pt of facePoints) {
-        ellipse(pt.x, pt.y, 10, 10);
-      }
+      if (head) {
+        fill(255, 0, 0);
+        noStroke();
+        ellipse(head.x, head.y, 10, 10);
 
-      // Buat koneksi acak antar wajah
-      stroke(255, 0, 0, 180);
-      strokeWeight(2);
-      for (let i = 0; i < facePoints.length; i++) {
-        let numConnections = floor(random(1, 3)); // 1-2 koneksi
-        let indices = getRandomIndicesExcept(facePoints.length, i, numConnections);
-        for (let j of indices) {
-          line(facePoints[i].x, facePoints[i].y, facePoints[j].x, facePoints[j].y);
+        stroke(255, 0, 0);
+        strokeWeight(2);
+        let numTali = 8;
+        let spread = PI / 1.5;
+
+        for (let i = 0; i < numTali; i++) {
+          let angle = map(i, 0, numTali - 1, -spread / 2, spread / 2);
+          let len = 60 + sin(frameCount * 0.1 + i) * 10;
+          let x2 = head.x + len * cos(angle);
+          let y2 = head.y - len * sin(angle);
+          line(head.x, head.y, x2, y2);
         }
       }
     }
 
-    function getRandomIndicesExcept(max, excludeIndex, count) {
-      let arr = [];
-      for (let i = 0; i < max; i++) {
-        if (i !== excludeIndex) arr.push(i);
-      }
-      shuffle(arr, true);
-      return arr.slice(0, count);
-    }
-
-    async function detectFaces() {
+    async function detectFace() {
       if (!model || video.readyState !== 4) {
-        setTimeout(detectFaces, 100);
+        setTimeout(detectFace, 100);
         return;
       }
 
       try {
         const predictions = await model.estimateFaces({ input: video });
-        facePoints = predictions.map(pred => {
-          const nose = pred.scaledMesh[1];
-          return createVector(
+        if (predictions.length > 0) {
+          const nose = predictions[0].scaledMesh[10]; // atas hidung / dahi
+          head = createVector(
             map(nose[0], 0, 640, 0, width),
             map(nose[1], 0, 480, 0, height)
           );
-        });
+        } else {
+          head = null;
+        }
       } catch (err) {
         console.error("Face detection error:", err);
       }
 
-      setTimeout(detectFaces, 200);
+      setTimeout(detectFace, 100);
     }
   </script>
 </body>
