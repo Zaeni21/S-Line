@@ -3,20 +3,23 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>S Line Simulation with Head Tracking</title>
+  <title>Tali Merah Sosial</title>
   <style>
     body {
       margin: 0;
+      padding-top: 20px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      height: 100vh;
-      background-color: #f0f0f0;
+      background-color: #f9f9f9;
       font-family: Arial, sans-serif;
     }
     #video {
-      display: none;
+      display: block;
+      border: 2px solid #000;
+      width: 320px;
+      height: 240px;
+      margin-bottom: 10px;
     }
     canvas {
       border: 1px solid #ccc;
@@ -24,103 +27,92 @@
   </style>
 </head>
 <body>
-  <video id="video" width="640" height="480" autoplay muted></video>
+  <video id="video" width="640" height="480" autoplay muted playsinline></video>
 
-  <!-- p5.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/p5.min.js"></script>
-
-  <!-- TensorFlow & Face Landmarks -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection@0.0.3/dist/face-landmarks-detection.min.js"></script>
 
-  <!-- All JS langsung di bawah -->
   <script>
     let video;
     let model;
-    let headPosition = null;
-    let points = [];
-    let connections = [];
+    let facePoints = [];
 
-    async function setup() {
-      createCanvas(800, 600);
+    function setup() {
+      createCanvas(320, 240);
 
       video = document.getElementById('video');
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        video.srcObject = stream;
-        video.play();
-      } catch (err) {
-        console.error("Webcam error:", err);
-        alert("Gagal akses kamera, cek izin di pengaturan browser bro!");
-        return;
-      }
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+          video.srcObject = stream;
+          video.play();
+        })
+        .catch(err => {
+          alert("Gagal akses kamera");
+          console.error(err);
+        });
 
-      try {
-        await tf.setBackend('webgl');
-        model = await faceLandmarksDetection.load(
+      tf.setBackend('webgl').then(() => {
+        faceLandmarksDetection.load(
           faceLandmarksDetection.SupportedPackages.mediapipeFacemesh
-        );
-        console.log("Model loaded successfully!");
-      } catch (err) {
-        console.error("Model loading error:", err);
-        alert("Gagal muat model wajah, cek koneksi internet bro!");
-        return;
-      }
-
-      for (let i = 0; i < 4; i++) {
-        points.push(createVector(random(width), random(height)));
-      }
-      connections.push([0, 1], [1, 2], [2, 3]);
-
-      detectFace();
+        ).then((loadedModel) => {
+          model = loadedModel;
+          detectFaces();
+        });
+      });
     }
 
     function draw() {
       background(255);
-      stroke(255, 0, 0);
-      strokeWeight(2);
-      for (let conn of connections) {
-        let p1 = points[conn[0]];
-        let p2 = points[conn[1]];
-        line(p1.x, p1.y, p2.x, p2.y);
-      }
 
+      // Gambar titik merah (hidung)
+      fill(255, 0, 0);
       noStroke();
-      fill(0);
-      for (let p of points) {
-        ellipse(p.x, p.y, 10, 10);
+      for (let pt of facePoints) {
+        ellipse(pt.x, pt.y, 10, 10);
       }
 
-      if (headPosition) {
-        fill(255, 0, 0);
-        ellipse(headPosition.x, headPosition.y, 15, 15);
-        stroke(255, 0, 0);
-        line(headPosition.x, headPosition.y, points[0].x, points[0].y);
+      // Buat koneksi acak antar wajah
+      stroke(255, 0, 0, 180);
+      strokeWeight(2);
+      for (let i = 0; i < facePoints.length; i++) {
+        let numConnections = floor(random(1, 3)); // 1-2 koneksi
+        let indices = getRandomIndicesExcept(facePoints.length, i, numConnections);
+        for (let j of indices) {
+          line(facePoints[i].x, facePoints[i].y, facePoints[j].x, facePoints[j].y);
+        }
       }
     }
 
-    async function detectFace() {
+    function getRandomIndicesExcept(max, excludeIndex, count) {
+      let arr = [];
+      for (let i = 0; i < max; i++) {
+        if (i !== excludeIndex) arr.push(i);
+      }
+      shuffle(arr, true);
+      return arr.slice(0, count);
+    }
+
+    async function detectFaces() {
       if (!model || video.readyState !== 4) {
-        setTimeout(detectFace, 100);
+        setTimeout(detectFaces, 100);
         return;
       }
+
       try {
         const predictions = await model.estimateFaces({ input: video });
-        if (predictions.length > 0) {
-          const face = predictions[0];
-          const landmarks = face.scaledMesh;
-          const nose = landmarks[1];
-          headPosition = createVector(
-            map(nose[0], 0, video.width, 0, width),
-            map(nose[1], 0, video.height, 0, height)
+        facePoints = predictions.map(pred => {
+          const nose = pred.scaledMesh[1];
+          return createVector(
+            map(nose[0], 0, 640, 0, width),
+            map(nose[1], 0, 480, 0, height)
           );
-        } else {
-          headPosition = null;
-        }
+        });
       } catch (err) {
         console.error("Face detection error:", err);
       }
-      setTimeout(detectFace, 100);
+
+      setTimeout(detectFaces, 200);
     }
   </script>
 </body>
