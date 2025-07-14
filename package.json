@@ -1,0 +1,13 @@
+{
+  "name": "s-line-head-tracking",
+  "version": "1.0.0",
+  "description": "S Line simulation with webcam and head tracking",
+  "scripts": {
+    "start": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "vercel": "latest"
+  }
+}
