@@ -3,32 +3,40 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Tali Merah Kepala</title>
+  <title>Aura Tali Merah Menyatu</title>
   <style>
     body {
       margin: 0;
-      padding-top: 20px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      background-color: #000;
-      font-family: Arial, sans-serif;
-      color: white;
+      background: #000;
+      overflow: hidden;
+    }
+    #container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
     }
     #video {
-      display: block;
-      border: 2px solid #fff;
-      width: 320px;
-      height: 240px;
-      margin-bottom: 10px;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 0;
     }
     canvas {
-      border: 1px solid #ccc;
+      position: absolute !important;
+      top: 0;
+      left: 0;
+      z-index: 1;
+      pointer-events: none;
     }
   </style>
 </head>
 <body>
-  <video id="video" width="640" height="480" autoplay muted playsinline></video>
+  <div id="container">
+    <video id="video" autoplay muted playsinline></video>
+  </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/p5.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
@@ -39,33 +47,24 @@
     let model;
     let head = null;
 
-    function setup() {
-      createCanvas(320, 240);
+    async function setup() {
+      const container = document.getElementById('container');
+      createCanvas(windowWidth, windowHeight).parent(container);
+
       video = document.getElementById('video');
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      video.srcObject = stream;
 
-      navigator.mediaDevices.getUserMedia({ video: true })
-        .then(stream => {
-          video.srcObject = stream;
-          video.play();
-        })
-        .catch(err => {
-          alert("Gagal akses kamera");
-          console.error(err);
-        });
+      await tf.setBackend('webgl');
+      model = await faceLandmarksDetection.load(
+        faceLandmarksDetection.SupportedPackages.mediapipeFacemesh
+      );
 
-      tf.setBackend('webgl').then(() => {
-        faceLandmarksDetection.load(
-          faceLandmarksDetection.SupportedPackages.mediapipeFacemesh
-        ).then(m => {
-          model = m;
-          detectFace();
-        });
-      });
+      detectFace();
     }
 
     function draw() {
-      background(0);
-
+      clear(); // penting! biar canvas transparan
       if (head) {
         fill(255, 0, 0);
         noStroke();
@@ -73,12 +72,11 @@
 
         stroke(255, 0, 0);
         strokeWeight(2);
-        let numTali = 8;
-        let spread = PI / 1.5;
-
-        for (let i = 0; i < numTali; i++) {
-          let angle = map(i, 0, numTali - 1, -spread / 2, spread / 2);
-          let len = 60 + sin(frameCount * 0.1 + i) * 10;
+        let total = 8;
+        let spread = PI / 1.2;
+        for (let i = 0; i < total; i++) {
+          let angle = map(i, 0, total - 1, -spread / 2, spread / 2);
+          let len = 80 + sin(frameCount * 0.1 + i) * 10;
           let x2 = head.x + len * cos(angle);
           let y2 = head.y - len * sin(angle);
           line(head.x, head.y, x2, y2);
@@ -95,10 +93,10 @@
       try {
         const predictions = await model.estimateFaces({ input: video });
         if (predictions.length > 0) {
-          const nose = predictions[0].scaledMesh[10]; // atas hidung / dahi
+          const nose = predictions[0].scaledMesh[10]; // dahi/atas hidung
           head = createVector(
-            map(nose[0], 0, 640, 0, width),
-            map(nose[1], 0, 480, 0, height)
+            map(nose[0], 0, video.videoWidth, 0, width),
+            map(nose[1], 0, video.videoHeight, 0, height)
           );
         } else {
           head = null;
@@ -108,6 +106,10 @@
       }
 
       setTimeout(detectFace, 100);
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
     }
   </script>
 </body>
