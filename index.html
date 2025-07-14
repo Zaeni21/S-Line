@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Aura Tali Merah Menyatu</title>
+  <title>S-Line Elegan</title>
   <style>
     body {
       margin: 0;
@@ -64,23 +64,32 @@
     }
 
     function draw() {
-      clear(); // penting! biar canvas transparan
+      clear();
       if (head) {
-        fill(255, 0, 0);
-        noStroke();
-        ellipse(head.x, head.y, 10, 10);
-
-        stroke(255, 0, 0);
-        strokeWeight(2);
-        let total = 8;
+        let total = 15;
         let spread = PI / 1.2;
+        stroke(255, 0, 0, 100);
+        strokeWeight(1.5);
+        noFill();
+
         for (let i = 0; i < total; i++) {
           let angle = map(i, 0, total - 1, -spread / 2, spread / 2);
-          let len = 80 + sin(frameCount * 0.1 + i) * 10;
-          let x2 = head.x + len * cos(angle);
-          let y2 = head.y - len * sin(angle);
-          line(head.x, head.y, x2, y2);
+          let len = 150;
+          let cx = head.x + len * cos(angle + sin(frameCount * 0.02 + i) * 0.1);
+          let cy = head.y - len * sin(angle);
+
+          // Bezier untuk efek elegan
+          beginShape();
+          stroke(255, 0, 0, 140);
+          strokeWeight(1.2 + sin(i + frameCount * 0.05) * 0.3);
+          bezier(head.x, head.y, head.x, head.y - 40, cx, cy - 40, cx, cy);
+          endShape();
         }
+
+        // Titik merah di kepala
+        noStroke();
+        fill(255, 0, 0);
+        ellipse(head.x, head.y, 8, 8);
       }
     }
 
@@ -93,10 +102,10 @@
       try {
         const predictions = await model.estimateFaces({ input: video });
         if (predictions.length > 0) {
-          const nose = predictions[0].scaledMesh[10]; // dahi/atas hidung
+          const landmark = predictions[0].scaledMesh[10]; // atas hidung/dahi
           head = createVector(
-            map(nose[0], 0, video.videoWidth, 0, width),
-            map(nose[1], 0, video.videoHeight, 0, height)
+            map(landmark[0], 0, video.videoWidth, 0, width),
+            map(landmark[1], 0, video.videoHeight, 0, height)
           );
         } else {
           head = null;
