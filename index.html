@@ -50,91 +50,96 @@
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection@0.0.3/dist/face-landmarks-detection.min.js"></script>
 
   <script>
-    let video = document.getElementById('video');
-    let canvas = document.getElementById('canvas');
-    let ctx = canvas.getContext('2d');
-    let currentStream;
-    let usingFrontCamera = true;
-    let model;
-    let head = null;
-    let numStrings = Math.floor(Math.random() * 6) + 3;
+  let video = document.getElementById('video');
+  let canvas = document.getElementById('canvas');
+  let ctx = canvas.getContext('2d');
+  let currentStream;
+  let usingFrontCamera = true;
+  let model;
+  let head = null;
+  let numStrings = Math.floor(Math.random() * 6) + 3;
 
-    async function setupCamera(facingMode = "user") {
-      if (currentStream) {
-        currentStream.getTracks().forEach(track => track.stop());
-      }
-      const constraints = {
-        audio: false,
-        video: { facingMode }
-      };
-      currentStream = await navigator.mediaDevices.getUserMedia(constraints);
-      video.srcObject = currentStream;
-      await new Promise(res => video.onloadedmetadata = res);
+  async function setupCamera(facingMode = "user") {
+    if (currentStream) {
+      currentStream.getTracks().forEach(track => track.stop());
     }
-
-    async function loadModel() {
-      await tf.setBackend('webgl');
-      model = await faceLandmarksDetection.load(
-        faceLandmarksDetection.SupportedPackages.mediapipeFacemesh
-      );
-    }
-
-    async function detectFace() {
-      if (!model || video.readyState !== 4) return;
-      const predictions = await model.estimateFaces({ input: video });
-      if (predictions.length > 0) {
-        const pos = predictions[0].scaledMesh[10]; // dahi
-        head = {
-          x: (pos[0] / video.videoWidth) * canvas.width,
-          y: (pos[1] / video.videoHeight) * canvas.height
-        };
-      } else {
-        head = null;
-      }
-    }
-
-    function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      if (!head) return;
-
-      const spread = Math.PI / 1.5;
-      for (let i = 0; i < numStrings; i++) {
-        const angle = -spread / 2 + (i / (numStrings - 1)) * spread;
-        const len = canvas.height * 0.9;
-        const cx = head.x + Math.sin(angle + Math.sin(i + Date.now() * 0.001)) * 20;
-        const cy = head.y - len;
-
-        ctx.beginPath();
-        ctx.moveTo(head.x, head.y);
-        ctx.bezierCurveTo(head.x, head.y - 40, cx, cy + 40, cx, cy);
-        ctx.strokeStyle = "rgba(255, 0, 0, 0.7)";
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-      }
-
-      ctx.fillStyle = "red";
-      ctx.beginPath();
-      ctx.arc(head.x, head.y, 6, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    function loop() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      detectFace().then(draw);
-      requestAnimationFrame(loop);
-    }
-
-    document.getElementById("switchBtn").onclick = async () => {
-      usingFrontCamera = !usingFrontCamera;
-      await setupCamera(usingFrontCamera ? "user" : "environment");
+    const constraints = {
+      audio: false,
+      video: { facingMode }
     };
-
-    setupCamera().then(() => {
-      loadModel().then(() => {
-        loop();
-      });
+    currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+    video.srcObject = currentStream;
+    return new Promise(resolve => {
+      video.onloadedmetadata = () => {
+        video.play();
+        resolve();
+      };
     });
-  </script>
+  }
+
+  async function loadModel() {
+    await tf.setBackend('webgl');
+    model = await faceLandmarksDetection.load(
+      faceLandmarksDetection.SupportedPackages.mediapipeFacemesh
+    );
+  }
+
+  async function detectFace() {
+    if (!model || video.readyState !== 4) return;
+    const predictions = await model.estimateFaces({ input: video });
+    if (predictions.length > 0) {
+      const pos = predictions[0].scaledMesh[10]; // dahi
+      head = {
+        x: (pos[0] / 640) * canvas.width,
+        y: (pos[1] / 480) * canvas.height
+      };
+    } else {
+      head = null;
+    }
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!head) return;
+
+    const spread = Math.PI / 1.5;
+    for (let i = 0; i < numStrings; i++) {
+      const angle = -spread / 2 + (i / (numStrings - 1)) * spread;
+      const len = canvas.height * 0.9;
+      const cx = head.x + Math.sin(angle + Math.sin(i + Date.now() * 0.001)) * 20;
+      const cy = head.y - len;
+
+      ctx.beginPath();
+      ctx.moveTo(head.x, head.y);
+      ctx.bezierCurveTo(head.x, head.y - 40, cx, cy + 40, cx, cy);
+      ctx.strokeStyle = "rgba(255, 0, 0, 0.7)";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = "red";
+    ctx.beginPath();
+    ctx.arc(head.x, head.y, 6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function loop() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    detectFace().then(draw);
+    requestAnimationFrame(loop);
+  }
+
+  document.getElementById("switchBtn").onclick = async () => {
+    usingFrontCamera = !usingFrontCamera;
+    await setupCamera(usingFrontCamera ? "user" : "environment");
+  };
+
+  setupCamera().then(() => {
+    loadModel().then(() => {
+      loop();
+    });
+  });
+</script>
 </body>
 </html>
