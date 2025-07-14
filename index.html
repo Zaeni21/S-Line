@@ -3,14 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>S-Line Full Power</title>
+  <title>S-Line Elegant Clean</title>
   <style>
     body, html {
       margin: 0;
       padding: 0;
       overflow: hidden;
       background: #000;
-      font-family: sans-serif;
     }
     #container {
       position: relative;
@@ -25,31 +24,24 @@
       height: 100%;
       object-fit: cover;
     }
-    #controls {
+    #switchBtn {
       position: absolute;
       top: 10px;
       left: 10px;
       z-index: 10;
-      display: flex;
-      gap: 10px;
-    }
-    button {
       background: rgba(0,0,0,0.5);
       color: white;
-      border: 1px solid #fff;
-      border-radius: 4px;
+      border: 1px solid white;
       padding: 6px 12px;
-      font-size: 14px;
+      border-radius: 4px;
       cursor: pointer;
+      font-size: 14px;
     }
   </style>
 </head>
 <body>
   <div id="container">
-    <div id="controls">
-      <button id="switchBtn">Switch Camera</button>
-      <button id="recordBtn">Start Recording</button>
-    </div>
+    <button id="switchBtn">Switch Camera</button>
     <video id="video" autoplay muted playsinline></video>
     <canvas id="canvas"></canvas>
   </div>
@@ -63,7 +55,7 @@
     let ctx = canvas.getContext('2d');
     let currentStream;
     let usingFrontCamera = true;
-    let model, recorder, chunks = [], recording = false;
+    let model;
     let head = null;
     let numStrings = Math.floor(Math.random() * 6) + 3;
 
@@ -108,13 +100,13 @@
       const spread = Math.PI / 1.5;
       for (let i = 0; i < numStrings; i++) {
         const angle = -spread / 2 + (i / (numStrings - 1)) * spread;
-        const len = canvas.height * 0.8;
+        const len = canvas.height * 0.9;
         const cx = head.x + Math.sin(angle + Math.sin(i + Date.now() * 0.001)) * 20;
         const cy = head.y - len;
 
         ctx.beginPath();
         ctx.moveTo(head.x, head.y);
-        ctx.bezierCurveTo(head.x, head.y - 50, cx, cy + 50, cx, cy);
+        ctx.bezierCurveTo(head.x, head.y - 40, cx, cy + 40, cx, cy);
         ctx.strokeStyle = "rgba(255, 0, 0, 0.7)";
         ctx.lineWidth = 1.5;
         ctx.stroke();
@@ -136,30 +128,6 @@
     document.getElementById("switchBtn").onclick = async () => {
       usingFrontCamera = !usingFrontCamera;
       await setupCamera(usingFrontCamera ? "user" : "environment");
-    };
-
-    document.getElementById("recordBtn").onclick = () => {
-      if (!recording) {
-        chunks = [];
-        let stream = canvas.captureStream();
-        recorder = new MediaRecorder(stream);
-        recorder.ondataavailable = e => chunks.push(e.data);
-        recorder.onstop = () => {
-          const blob = new Blob(chunks, { type: "video/webm" });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = "s-line-video.webm";
-          a.click();
-        };
-        recorder.start();
-        recording = true;
-        document.getElementById("recordBtn").textContent = "Stop Recording";
-      } else {
-        recorder.stop();
-        recording = false;
-        document.getElementById("recordBtn").textContent = "Start Recording";
-      }
     };
 
     setupCamera().then(() => {
