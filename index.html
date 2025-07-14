@@ -3,123 +3,170 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>S-Line Elegan</title>
+  <title>S-Line Full Power</title>
   <style>
-    body {
+    body, html {
       margin: 0;
-      background: #000;
+      padding: 0;
       overflow: hidden;
+      background: #000;
+      font-family: sans-serif;
     }
     #container {
       position: relative;
       width: 100vw;
       height: 100vh;
     }
-    #video {
+    video, canvas {
       position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
       object-fit: cover;
-      z-index: 0;
     }
-    canvas {
-      position: absolute !important;
-      top: 0;
-      left: 0;
-      z-index: 1;
-      pointer-events: none;
+    #controls {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 10;
+      display: flex;
+      gap: 10px;
+    }
+    button {
+      background: rgba(0,0,0,0.5);
+      color: white;
+      border: 1px solid #fff;
+      border-radius: 4px;
+      padding: 6px 12px;
+      font-size: 14px;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
   <div id="container">
+    <div id="controls">
+      <button id="switchBtn">Switch Camera</button>
+      <button id="recordBtn">Start Recording</button>
+    </div>
     <video id="video" autoplay muted playsinline></video>
+    <canvas id="canvas"></canvas>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/p5.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection@0.0.3/dist/face-landmarks-detection.min.js"></script>
 
   <script>
-    let video;
-    let model;
+    let video = document.getElementById('video');
+    let canvas = document.getElementById('canvas');
+    let ctx = canvas.getContext('2d');
+    let currentStream;
+    let usingFrontCamera = true;
+    let model, recorder, chunks = [], recording = false;
     let head = null;
+    let numStrings = Math.floor(Math.random() * 6) + 3;
 
-    async function setup() {
-      const container = document.getElementById('container');
-      createCanvas(windowWidth, windowHeight).parent(container);
+    async function setupCamera(facingMode = "user") {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
+      const constraints = {
+        audio: false,
+        video: { facingMode }
+      };
+      currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+      video.srcObject = currentStream;
+      await new Promise(res => video.onloadedmetadata = res);
+    }
 
-      video = document.getElementById('video');
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      video.srcObject = stream;
-
+    async function loadModel() {
       await tf.setBackend('webgl');
       model = await faceLandmarksDetection.load(
         faceLandmarksDetection.SupportedPackages.mediapipeFacemesh
       );
-
-      detectFace();
-    }
-
-    function draw() {
-      clear();
-      if (head) {
-        let total = 15;
-        let spread = PI / 1.2;
-        stroke(255, 0, 0, 100);
-        strokeWeight(1.5);
-        noFill();
-
-        for (let i = 0; i < total; i++) {
-          let angle = map(i, 0, total - 1, -spread / 2, spread / 2);
-          let len = 150;
-          let cx = head.x + len * cos(angle + sin(frameCount * 0.02 + i) * 0.1);
-          let cy = head.y - len * sin(angle);
-
-          // Bezier untuk efek elegan
-          beginShape();
-          stroke(255, 0, 0, 140);
-          strokeWeight(1.2 + sin(i + frameCount * 0.05) * 0.3);
-          bezier(head.x, head.y, head.x, head.y - 40, cx, cy - 40, cx, cy);
-          endShape();
-        }
-
-        // Titik merah di kepala
-        noStroke();
-        fill(255, 0, 0);
-        ellipse(head.x, head.y, 8, 8);
-      }
     }
 
     async function detectFace() {
-      if (!model || video.readyState !== 4) {
-        setTimeout(detectFace, 100);
-        return;
+      if (!model || video.readyState !== 4) return;
+      const predictions = await model.estimateFaces({ input: video });
+      if (predictions.length > 0) {
+        const pos = predictions[0].scaledMesh[10]; // dahi
+        head = {
+          x: (pos[0] / video.videoWidth) * canvas.width,
+          y: (pos[1] / video.videoHeight) * canvas.height
+        };
+      } else {
+        head = null;
       }
-
-      try {
-        const predictions = await model.estimateFaces({ input: video });
-        if (predictions.length > 0) {
-          const landmark = predictions[0].scaledMesh[10]; // atas hidung/dahi
-          head = createVector(
-            map(landmark[0], 0, video.videoWidth, 0, width),
-            map(landmark[1], 0, video.videoHeight, 0, height)
-          );
-        } else {
-          head = null;
-        }
-      } catch (err) {
-        console.error("Face detection error:", err);
-      }
-
-      setTimeout(detectFace, 100);
     }
 
-    function windowResized() {
-      resizeCanvas(windowWidth, windowHeight);
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (!head) return;
+
+      const spread = Math.PI / 1.5;
+      for (let i = 0; i < numStrings; i++) {
+        const angle = -spread / 2 + (i / (numStrings - 1)) * spread;
+        const len = canvas.height * 0.8;
+        const cx = head.x + Math.sin(angle + Math.sin(i + Date.now() * 0.001)) * 20;
+        const cy = head.y - len;
+
+        ctx.beginPath();
+        ctx.moveTo(head.x, head.y);
+        ctx.bezierCurveTo(head.x, head.y - 50, cx, cy + 50, cx, cy);
+        ctx.strokeStyle = "rgba(255, 0, 0, 0.7)";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = "red";
+      ctx.beginPath();
+      ctx.arc(head.x, head.y, 6, 0, Math.PI * 2);
+      ctx.fill();
     }
+
+    function loop() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      detectFace().then(draw);
+      requestAnimationFrame(loop);
+    }
+
+    document.getElementById("switchBtn").onclick = async () => {
+      usingFrontCamera = !usingFrontCamera;
+      await setupCamera(usingFrontCamera ? "user" : "environment");
+    };
+
+    document.getElementById("recordBtn").onclick = () => {
+      if (!recording) {
+        chunks = [];
+        let stream = canvas.captureStream();
+        recorder = new MediaRecorder(stream);
+        recorder.ondataavailable = e => chunks.push(e.data);
+        recorder.onstop = () => {
+          const blob = new Blob(chunks, { type: "video/webm" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "s-line-video.webm";
+          a.click();
+        };
+        recorder.start();
+        recording = true;
+        document.getElementById("recordBtn").textContent = "Stop Recording";
+      } else {
+        recorder.stop();
+        recording = false;
+        document.getElementById("recordBtn").textContent = "Start Recording";
+      }
+    };
+
+    setupCamera().then(() => {
+      loadModel().then(() => {
+        loop();
+      });
+    });
   </script>
 </body>
 </html>
